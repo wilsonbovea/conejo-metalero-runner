@@ -2,14 +2,17 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Conejo Metalero Runner</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div id="game-wrap">
-    <canvas id="game" width="800" height="300"></canvas>
-    <div id="hint">Salta / sal del túnel: ESPACIO / ↑ / clic &nbsp;·&nbsp; Agacharte o entrar al túnel: ↓ &nbsp;·&nbsp; 🥕 Zanahoria = Modo Metal &nbsp;·&nbsp; 🦝 Garras = puedes bajar bajo tierra (la superficie sigue igual; cuidado con las rocas del túnel, no eres invencible)</div>
+    <div id="canvas-area">
+      <canvas id="game" width="800" height="300"></canvas>
+      <button id="btn-down-left" class="touch-btn touch-btn-left" aria-label="Agacharse">&#9660;</button>
+      <button id="btn-up-right" class="touch-btn touch-btn-right" aria-label="Saltar">&#9650;</button>
+    </div>
   </div>
   <script src="script.js"></script>
 </body>

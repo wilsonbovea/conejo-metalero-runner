@@ -117,7 +117,7 @@
   };
 
   const dino = {
-    x: 50,
+    x: 130,
     y: GROUND_Y - 50,
     w: 48,
     h: 50,
@@ -1112,7 +1112,7 @@
       ctx.fillStyle = c.text;
       ctx.font = 'bold 11px monospace';
       ctx.textAlign = 'right';
-      ctx.fillText(dino.burrowed ? 'GARRAS (↑ salir)' : 'GARRAS (↓)', W - 14, 55);
+      ctx.fillText('GARRAS', W - 14, 55);
     }
   }
 
@@ -1142,9 +1142,9 @@
     drawHUD(c);
 
     if (state === 'waiting') {
-      drawCenterText(c, ['CONEJO METALERO', 'ESPACIO para empezar · 🥕 Modo Metal · 🦝 Garras']);
+      drawCenterText(c, ['CONEJO METALERO', 'TOCA PARA EMPEZAR']);
     } else if (state === 'gameover') {
-      drawCenterText(c, ['GAME OVER', 'Presiona ESPACIO para reintentar']);
+      drawCenterText(c, ['GAME OVER', 'TOCA PARA REINTENTAR']);
     }
   }
 
@@ -1163,24 +1163,32 @@
     }
   }
 
+  function pressDown() {
+    downHeld = true;
+    if (clawsActive) {
+      enterBurrow();
+    } else {
+      setDuck(true);
+    }
+  }
+
+  function releaseDown() {
+    downHeld = false;
+    setDuck(false);
+  }
+
   window.addEventListener('keydown', (e) => {
     if (e.code === 'Space' || e.code === 'ArrowUp') {
       handleJumpKey(e);
     } else if (e.code === 'ArrowDown') {
       e.preventDefault();
-      downHeld = true;
-      if (clawsActive) {
-        enterBurrow();
-      } else {
-        setDuck(true);
-      }
+      pressDown();
     }
   });
 
   window.addEventListener('keyup', (e) => {
     if (e.code === 'ArrowDown') {
-      downHeld = false;
-      setDuck(false);
+      releaseDown();
     }
   });
 
@@ -1192,6 +1200,34 @@
       jumpOrSurface();
     }
   });
+
+  const btnDown = document.getElementById('btn-down-left');
+  if (btnDown) {
+    btnDown.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      pressDown();
+    });
+    btnDown.addEventListener('pointerup', (e) => {
+      e.preventDefault();
+      releaseDown();
+    });
+    btnDown.addEventListener('pointerleave', () => releaseDown());
+    btnDown.addEventListener('pointercancel', () => releaseDown());
+  }
+
+  const btnUp = document.getElementById('btn-up-right');
+  if (btnUp) {
+    btnUp.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (state === 'waiting' || state === 'gameover') {
+        startGame();
+      } else {
+        jumpOrSurface();
+      }
+    });
+  }
 
   resetDino();
   requestAnimationFrame(loop);
