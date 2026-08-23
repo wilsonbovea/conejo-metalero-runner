@@ -81,10 +81,23 @@
     phase: Math.random() * Math.PI * 2,
   }));
 
+  let muted = localStorage.getItem('conejo_muted') === '1';
+
   let audioCtx = null;
+  let masterGain = null;
+  function ensureAudioCtx() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      masterGain = audioCtx.createGain();
+      masterGain.gain.value = muted ? 0 : 1;
+      masterGain.connect(audioCtx.destination);
+    }
+    return audioCtx;
+  }
   function beep(freq, duration, type = 'square', volume = 0.05, delay = 0) {
+    if (muted) return;
     try {
-      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      ensureAudioCtx();
       const t0 = audioCtx.currentTime + delay;
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
@@ -92,7 +105,7 @@
       osc.frequency.value = freq;
       gain.gain.value = volume;
       osc.connect(gain);
-      gain.connect(audioCtx.destination);
+      gain.connect(masterGain);
       osc.start(t0);
       gain.gain.exponentialRampToValueAtTime(0.001, t0 + duration);
       osc.stop(t0 + duration);
@@ -101,8 +114,20 @@
   const jumpAudio = new Audio('sfx/salto.ogg');
   jumpAudio.preload = 'auto';
   const sfxJump = () => {
+    if (muted) return;
     try {
       const a = jumpAudio.cloneNode(true);
+      a.volume = 0.35;
+      a.play().catch(() => {});
+    } catch (e) { /* ignore audio errors */ }
+  };
+  const yeahAudio = new Audio('sfx/yeah.wav');
+  yeahAudio.preload = 'auto';
+  const sfxYeah = () => {
+    if (muted) return;
+    try {
+      const a = yeahAudio.cloneNode(true);
+      a.volume = 0.8;
       a.play().catch(() => {});
     } catch (e) { /* ignore audio errors */ }
   };
@@ -125,7 +150,9 @@
   const clawsLaughAudio = new Audio('sfx/risa-garras.ogg');
   clawsLaughAudio.preload = 'auto';
   clawsLaughAudio.volume = 0.8;
+  clawsLaughAudio.muted = muted;
   const sfxEvilLaugh = () => {
+    if (muted) return;
     try {
       clawsLaughAudio.currentTime = 0;
       clawsLaughAudio.play().catch(() => {});
@@ -138,17 +165,60 @@
     } catch (e) { /* ignore audio errors */ }
   };
 
-  function speak(text, { pitch = 1, rate = 1 } = {}) {
+  const sfxStep = (foot) => {
+    beep(foot === 0 ? 150 : 128, 0.06, 'triangle', 0.05);
+  };
+
+  let noiseBuffer = null;
+  function getNoiseBuffer() {
+    if (!noiseBuffer) {
+      const len = audioCtx.sampleRate * 2;
+      noiseBuffer = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+      const data = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    }
+    return noiseBuffer;
+  }
+  let digSource = null;
+  const startDigSound = () => {
     try {
-      if (!('speechSynthesis' in window)) return;
-      window.speechSynthesis.cancel();
-      const utter = new SpeechSynthesisUtterance(text);
-      utter.pitch = pitch;
-      utter.rate = rate;
-      utter.volume = 0.9;
-      utter.lang = 'es-ES';
-      window.speechSynthesis.speak(utter);
-    } catch (e) { /* ignore speech errors */ }
+      ensureAudioCtx();
+      if (digSource) return;
+      digSource = audioCtx.createBufferSource();
+      digSource.buffer = getNoiseBuffer();
+      digSource.loop = true;
+      const filter = audioCtx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.value = 450;
+      filter.Q.value = 0.6;
+      const gain = audioCtx.createGain();
+      gain.gain.value = 0.08;
+      digSource.connect(filter);
+      filter.connect(gain);
+      gain.connect(masterGain);
+      digSource.start();
+    } catch (e) { /* ignore audio errors */ }
+  };
+  const stopDigSound = () => {
+    try {
+      if (digSource) {
+        digSource.stop();
+        digSource.disconnect();
+        digSource = null;
+      }
+    } catch (e) { /* ignore audio errors */ }
+  };
+
+  function setMuted(next) {
+    muted = next;
+    localStorage.setItem('conejo_muted', muted ? '1' : '0');
+    if (masterGain) masterGain.gain.value = muted ? 0 : 1;
+    clawsLaughAudio.muted = muted;
+    const btn = document.getElementById('btn-mute');
+    if (btn) {
+      btn.textContent = muted ? '🔇' : '🔊';
+      btn.setAttribute('aria-label', muted ? 'Activar sonido' : 'Silenciar sonido');
+    }
   }
 
   const dino = {
@@ -197,6 +267,7 @@
     dino.grounded = true;
     burrowObstacleTimer = nextBurrowRockGap();
     sfxBurrow();
+    startDigSound();
   }
 
   function exitBurrow() {
@@ -205,6 +276,7 @@
     dino.y = GROUND_Y - dino.h;
     dino.grounded = true;
     sfxJump();
+    stopDigSound();
   }
 
   function jumpOrSurface() {
@@ -229,6 +301,8 @@
   let powerups = [];
   let powerupTimer = 0;
   let particles = [];
+  let stepTimer = 0;
+  const STEP_DISTANCE = 70;
 
   function nextObstacleGap() {
     const base = 320 - speed * 10;
@@ -323,6 +397,8 @@
     clawsActive = false;
     clawsTimer = 0;
     stopEvilLaugh();
+    stopDigSound();
+    stepTimer = 0;
     obstacleTimer = nextObstacleGap();
     powerupTimer = nextPowerupGap();
     resetDino();
@@ -331,6 +407,7 @@
   function endGame() {
     state = 'gameover';
     stopEvilLaugh();
+    stopDigSound();
     sfxHit();
     if (score > highScore) {
       highScore = Math.floor(score);
@@ -369,7 +446,7 @@
     metalTimer = METAL_DURATION;
     celebrateTimer = CELEBRATE_DURATION;
     sfxPower();
-    speak('¡Yeaah!', { pitch: 1.4, rate: 1.15 });
+    sfxYeah();
   }
 
   function activateClawsPower() {
@@ -377,7 +454,6 @@
     clawsTimer = CLAWS_DURATION;
     sfxBurrow();
     sfxEvilLaugh();
-    speak('¡Muajaja!', { pitch: 0.55, rate: 0.85 });
   }
 
   function update() {
@@ -429,6 +505,14 @@
       if (dino.legTimer > (metalMode ? 3 : 6)) {
         dino.legTimer = 0;
         dino.legFrame = 1 - dino.legFrame;
+      }
+
+      if (dino.grounded && !dino.burrowed) {
+        stepTimer -= speed;
+        if (stepTimer <= 0) {
+          stepTimer += STEP_DISTANCE;
+          sfxStep(dino.legFrame);
+        }
       }
 
       groundOffset -= speed;
@@ -1206,18 +1290,14 @@
     ctx.restore();
   }
 
-  function drawCenterText(c, lines) {
+  function drawCenterText(c, title) {
     ctx.fillStyle = c.panel;
-    roundRect(W / 2 - 190, H / 2 - 40, 380, 76, 10);
+    roundRect(W / 2 - 190, H / 2 - 34, 380, 56, 10);
     ctx.fill();
     ctx.fillStyle = c.text;
     ctx.textAlign = 'center';
     ctx.font = 'bold 24px monospace';
-    ctx.fillText(lines[0], W / 2, H / 2 - 8);
-    if (lines[1]) {
-      ctx.font = '14px monospace';
-      ctx.fillText(lines[1], W / 2, H / 2 + 20);
-    }
+    ctx.fillText(title, W / 2, H / 2 - 2);
   }
 
   function draw() {
@@ -1231,12 +1311,16 @@
     drawParticles();
     drawHUD(c);
 
-    if (state === 'waiting') {
-      drawCenterText(c, ['CONEJO METALERO', 'TOCA PARA EMPEZAR']);
+    const btnStart = document.getElementById('btn-start');
+    if (state === 'waiting' || state === 'gameover') {
+      drawCenterText(c, state === 'waiting' ? 'CONEJO METALERO' : 'GAME OVER');
       drawControlHint(c);
-    } else if (state === 'gameover') {
-      drawCenterText(c, ['GAME OVER', 'TOCA PARA REINTENTAR']);
-      drawControlHint(c);
+      if (btnStart) {
+        btnStart.textContent = state === 'waiting' ? '▶ EMPEZAR' : '▶ REINTENTAR';
+        btnStart.classList.add('visible');
+      }
+    } else if (btnStart) {
+      btnStart.classList.remove('visible');
     }
   }
 
@@ -1286,10 +1370,7 @@
 
   canvas.addEventListener('pointerdown', (e) => {
     e.preventDefault();
-    if (state === 'waiting' || state === 'gameover') {
-      startGame();
-      return;
-    }
+    if (state !== 'running') return;
     const rect = canvas.getBoundingClientRect();
     const relX = e.clientX - rect.left;
     if (relX < rect.width / 2) {
@@ -1302,6 +1383,26 @@
   canvas.addEventListener('pointerup', () => releaseDown());
   canvas.addEventListener('pointerleave', () => releaseDown());
   canvas.addEventListener('pointercancel', () => releaseDown());
+
+  const btnStart = document.getElementById('btn-start');
+  if (btnStart) {
+    btnStart.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      startGame();
+    });
+  }
+
+  const btnMute = document.getElementById('btn-mute');
+  if (btnMute) {
+    btnMute.textContent = muted ? '🔇' : '🔊';
+    btnMute.setAttribute('aria-label', muted ? 'Activar sonido' : 'Silenciar sonido');
+    btnMute.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setMuted(!muted);
+    });
+  }
 
   resetDino();
   requestAnimationFrame(loop);

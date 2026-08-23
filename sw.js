@@ -1,4 +1,4 @@
-const CACHE_NAME = 'conejo-metalero-v2';
+const CACHE_NAME = 'conejo-metalero-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -9,6 +9,7 @@ const ASSETS = [
   './icon-512.png',
   './sfx/salto.ogg',
   './sfx/risa-garras.ogg',
+  './sfx/yeah.wav',
 ];
 
 self.addEventListener('install', (event) => {
@@ -25,6 +26,12 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
+    fetch(event.request)
+      .then((res) => {
+        const copy = res.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        return res;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
