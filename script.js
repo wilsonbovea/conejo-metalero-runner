@@ -1225,6 +1225,23 @@
     }
   }
 
+  function drawControlHint(c) {
+    ctx.save();
+    ctx.globalAlpha = 0.8;
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(W / 2, H - 36);
+    ctx.lineTo(W / 2, H - 6);
+    ctx.stroke();
+    ctx.fillStyle = c.text;
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 13px monospace';
+    ctx.fillText('◀ AGACHARSE', W / 4, H - 14);
+    ctx.fillText('SALTAR ▶', (W * 3) / 4, H - 14);
+    ctx.restore();
+  }
+
   function drawCenterText(c, lines) {
     ctx.fillStyle = c.panel;
     roundRect(W / 2 - 190, H / 2 - 40, 380, 76, 10);
@@ -1253,8 +1270,10 @@
 
     if (state === 'waiting') {
       drawCenterText(c, ['CONEJO METALERO', 'TOCA PARA EMPEZAR']);
+      drawControlHint(c);
     } else if (state === 'gameover') {
       drawCenterText(c, ['GAME OVER', 'TOCA PARA REINTENTAR']);
+      drawControlHint(c);
     }
   }
 
@@ -1306,38 +1325,20 @@
     e.preventDefault();
     if (state === 'waiting' || state === 'gameover') {
       startGame();
+      return;
+    }
+    const rect = canvas.getBoundingClientRect();
+    const relX = e.clientX - rect.left;
+    if (relX < rect.width / 2) {
+      pressDown();
     } else {
       jumpOrSurface();
     }
   });
 
-  const btnDown = document.getElementById('btn-down-left');
-  if (btnDown) {
-    btnDown.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      pressDown();
-    });
-    btnDown.addEventListener('pointerup', (e) => {
-      e.preventDefault();
-      releaseDown();
-    });
-    btnDown.addEventListener('pointerleave', () => releaseDown());
-    btnDown.addEventListener('pointercancel', () => releaseDown());
-  }
-
-  const btnUp = document.getElementById('btn-up-right');
-  if (btnUp) {
-    btnUp.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (state === 'waiting' || state === 'gameover') {
-        startGame();
-      } else {
-        jumpOrSurface();
-      }
-    });
-  }
+  canvas.addEventListener('pointerup', () => releaseDown());
+  canvas.addEventListener('pointerleave', () => releaseDown());
+  canvas.addEventListener('pointercancel', () => releaseDown());
 
   resetDino();
   requestAnimationFrame(loop);
