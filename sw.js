@@ -1,4 +1,4 @@
-const CACHE_NAME = 'conejo-metalero-v1';
+const CACHE_NAME = 'conejo-metalero-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -7,6 +7,8 @@ const ASSETS = [
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
+  './sfx/salto.ogg',
+  './sfx/risa-garras.ogg',
 ];
 
 self.addEventListener('install', (event) => {

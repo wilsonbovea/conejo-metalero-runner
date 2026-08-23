@@ -98,7 +98,14 @@
       osc.stop(t0 + duration);
     } catch (e) { /* ignore audio errors */ }
   }
-  const sfxJump = () => beep(520, 0.12, 'square', 0.05);
+  const jumpAudio = new Audio('sfx/salto.ogg');
+  jumpAudio.preload = 'auto';
+  const sfxJump = () => {
+    try {
+      const a = jumpAudio.cloneNode(true);
+      a.play().catch(() => {});
+    } catch (e) { /* ignore audio errors */ }
+  };
   const sfxHit = () => beep(120, 0.3, 'sawtooth', 0.07);
   const sfxPower = () => {
     beep(392, 0.09, 'square', 0.05, 0);
@@ -115,10 +122,20 @@
     beep(180, 0.16, 'sawtooth', 0.05, 0.08);
     beep(110, 0.2, 'sawtooth', 0.05, 0.16);
   };
+  const clawsLaughAudio = new Audio('sfx/risa-garras.ogg');
+  clawsLaughAudio.preload = 'auto';
+  clawsLaughAudio.volume = 0.8;
   const sfxEvilLaugh = () => {
-    [0, 0.13, 0.26, 0.39].forEach((delay, i) => {
-      beep(200 - i * 18, 0.11, 'sawtooth', 0.05, delay);
-    });
+    try {
+      clawsLaughAudio.currentTime = 0;
+      clawsLaughAudio.play().catch(() => {});
+    } catch (e) { /* ignore audio errors */ }
+  };
+  const stopEvilLaugh = () => {
+    try {
+      clawsLaughAudio.pause();
+      clawsLaughAudio.currentTime = 0;
+    } catch (e) { /* ignore audio errors */ }
   };
 
   function speak(text, { pitch = 1, rate = 1 } = {}) {
@@ -132,11 +149,6 @@
       utter.lang = 'es-ES';
       window.speechSynthesis.speak(utter);
     } catch (e) { /* ignore speech errors */ }
-  }
-
-  let speechBubble = null;
-  function showSpeech(text, duration = 70) {
-    speechBubble = { text, timer: duration, maxTimer: duration };
   }
 
   const dino = {
@@ -310,7 +322,7 @@
     celebrateTimer = 0;
     clawsActive = false;
     clawsTimer = 0;
-    speechBubble = null;
+    stopEvilLaugh();
     obstacleTimer = nextObstacleGap();
     powerupTimer = nextPowerupGap();
     resetDino();
@@ -318,6 +330,7 @@
 
   function endGame() {
     state = 'gameover';
+    stopEvilLaugh();
     sfxHit();
     if (score > highScore) {
       highScore = Math.floor(score);
@@ -357,7 +370,6 @@
     celebrateTimer = CELEBRATE_DURATION;
     sfxPower();
     speak('¡Yeaah!', { pitch: 1.4, rate: 1.15 });
-    showSpeech('¡YEAAH!');
   }
 
   function activateClawsPower() {
@@ -366,7 +378,6 @@
     sfxBurrow();
     sfxEvilLaugh();
     speak('¡Muajaja!', { pitch: 0.55, rate: 0.85 });
-    showSpeech('¡MUAJAJA!');
   }
 
   function update() {
@@ -390,15 +401,12 @@
         clawsTimer--;
         if (clawsTimer <= 0) {
           clawsActive = false;
+          stopEvilLaugh();
           if (dino.burrowed) exitBurrow();
           powerupTimer = nextPowerupGap();
         }
       }
       if (celebrateTimer > 0) celebrateTimer--;
-      if (speechBubble) {
-        speechBubble.timer--;
-        if (speechBubble.timer <= 0) speechBubble = null;
-      }
 
       if (!dino.grounded) {
         dino.vy += GRAVITY;
@@ -1109,50 +1117,6 @@
     }
   }
 
-  function drawSpeechBubble() {
-    if (!speechBubble) return;
-    const fadeIn = Math.min(1, (speechBubble.maxTimer - speechBubble.timer) / 8);
-    const fadeOut = Math.min(1, speechBubble.timer / 12);
-    const alpha = Math.min(fadeIn, fadeOut);
-    if (alpha <= 0) return;
-
-    const bob = Math.sin(frame * 0.3) * 2;
-    const bx = dino.x + 20;
-    const by = (dino.burrowed ? GROUND_Y - 6 : dino.y) - 18 + bob;
-
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.font = 'bold 15px monospace';
-    const textW = ctx.measureText(speechBubble.text).width;
-    const padX = 10, boxH = 26, tailH = 8;
-    const boxW = textW + padX * 2;
-    const boxY = by - boxH - tailH;
-
-    ctx.fillStyle = '#fff9ec';
-    roundRect(bx, boxY, boxW, boxH, 7);
-    ctx.fill();
-    ctx.strokeStyle = '#1c1c1e';
-    ctx.lineWidth = 1.5;
-    roundRect(bx, boxY, boxW, boxH, 7);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(bx + 12, boxY + boxH - 1);
-    ctx.lineTo(bx + 6, boxY + boxH + tailH);
-    ctx.lineTo(bx + 22, boxY + boxH - 1);
-    ctx.closePath();
-    ctx.fillStyle = '#fff9ec';
-    ctx.fill();
-    ctx.strokeStyle = '#1c1c1e';
-    ctx.stroke();
-
-    ctx.fillStyle = '#1c1c1e';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(speechBubble.text, bx + padX, boxY + boxH / 2 + 1);
-    ctx.restore();
-  }
-
   function roundRect(x, y, w, h, r) {
     ctx.beginPath();
     ctx.moveTo(x + r, y);
@@ -1265,7 +1229,6 @@
     drawObstacles();
     drawRabbit(c);
     drawParticles();
-    drawSpeechBubble();
     drawHUD(c);
 
     if (state === 'waiting') {
