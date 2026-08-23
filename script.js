@@ -166,7 +166,7 @@
   };
 
   const sfxStep = (foot) => {
-    beep(foot === 0 ? 150 : 128, 0.06, 'triangle', 0.05);
+    beep(foot === 0 ? 150 : 128, 0.07, 'triangle', 0.09);
   };
 
   let noiseBuffer = null;
@@ -1403,6 +1403,29 @@
       setMuted(!muted);
     });
   }
+
+  let deferredInstallPrompt = null;
+  const btnInstall = document.getElementById('btn-install');
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    if (btnInstall) btnInstall.classList.add('visible');
+  });
+  if (btnInstall) {
+    btnInstall.addEventListener('pointerdown', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      await deferredInstallPrompt.userChoice;
+      deferredInstallPrompt = null;
+      btnInstall.classList.remove('visible');
+    });
+  }
+  window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    if (btnInstall) btnInstall.classList.remove('visible');
+  });
 
   resetDino();
   requestAnimationFrame(loop);
