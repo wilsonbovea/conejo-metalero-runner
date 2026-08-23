@@ -87,6 +87,34 @@ canvas#game {
   .touch-btn {
     display: flex;
   }
+
+  body {
+    background: #000;
+  }
+
+  #game-wrap {
+    max-width: none;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    padding: 0;
+  }
+
+  #canvas-area {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  canvas#game {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    aspect-ratio: unset;
+    object-fit: cover;
+    border-radius: 0;
+    box-shadow: none;
+  }
 }
 
 /* On small portrait screens, rotate the whole page into a landscape layout */

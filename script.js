@@ -115,6 +115,29 @@
     beep(180, 0.16, 'sawtooth', 0.05, 0.08);
     beep(110, 0.2, 'sawtooth', 0.05, 0.16);
   };
+  const sfxEvilLaugh = () => {
+    [0, 0.13, 0.26, 0.39].forEach((delay, i) => {
+      beep(200 - i * 18, 0.11, 'sawtooth', 0.05, delay);
+    });
+  };
+
+  function speak(text, { pitch = 1, rate = 1 } = {}) {
+    try {
+      if (!('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.pitch = pitch;
+      utter.rate = rate;
+      utter.volume = 0.9;
+      utter.lang = 'es-ES';
+      window.speechSynthesis.speak(utter);
+    } catch (e) { /* ignore speech errors */ }
+  }
+
+  let speechBubble = null;
+  function showSpeech(text, duration = 70) {
+    speechBubble = { text, timer: duration, maxTimer: duration };
+  }
 
   const dino = {
     x: 130,
@@ -287,6 +310,7 @@
     celebrateTimer = 0;
     clawsActive = false;
     clawsTimer = 0;
+    speechBubble = null;
     obstacleTimer = nextObstacleGap();
     powerupTimer = nextPowerupGap();
     resetDino();
@@ -301,7 +325,17 @@
     }
   }
 
+  function tryFullscreen() {
+    try {
+      const el = document.documentElement;
+      if (el.requestFullscreen && !document.fullscreenElement) {
+        el.requestFullscreen().catch(() => {});
+      }
+    } catch (e) { /* ignore fullscreen errors */ }
+  }
+
   function startGame() {
+    tryFullscreen();
     resetGame();
     state = 'running';
   }
@@ -322,12 +356,17 @@
     metalTimer = METAL_DURATION;
     celebrateTimer = CELEBRATE_DURATION;
     sfxPower();
+    speak('¡Yeaah!', { pitch: 1.4, rate: 1.15 });
+    showSpeech('¡YEAAH!');
   }
 
   function activateClawsPower() {
     clawsActive = true;
     clawsTimer = CLAWS_DURATION;
     sfxBurrow();
+    sfxEvilLaugh();
+    speak('¡Muajaja!', { pitch: 0.55, rate: 0.85 });
+    showSpeech('¡MUAJAJA!');
   }
 
   function update() {
@@ -356,6 +395,10 @@
         }
       }
       if (celebrateTimer > 0) celebrateTimer--;
+      if (speechBubble) {
+        speechBubble.timer--;
+        if (speechBubble.timer <= 0) speechBubble = null;
+      }
 
       if (!dino.grounded) {
         dino.vy += GRAVITY;
@@ -1066,6 +1109,50 @@
     }
   }
 
+  function drawSpeechBubble() {
+    if (!speechBubble) return;
+    const fadeIn = Math.min(1, (speechBubble.maxTimer - speechBubble.timer) / 8);
+    const fadeOut = Math.min(1, speechBubble.timer / 12);
+    const alpha = Math.min(fadeIn, fadeOut);
+    if (alpha <= 0) return;
+
+    const bob = Math.sin(frame * 0.3) * 2;
+    const bx = dino.x + 20;
+    const by = (dino.burrowed ? GROUND_Y - 6 : dino.y) - 18 + bob;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.font = 'bold 15px monospace';
+    const textW = ctx.measureText(speechBubble.text).width;
+    const padX = 10, boxH = 26, tailH = 8;
+    const boxW = textW + padX * 2;
+    const boxY = by - boxH - tailH;
+
+    ctx.fillStyle = '#fff9ec';
+    roundRect(bx, boxY, boxW, boxH, 7);
+    ctx.fill();
+    ctx.strokeStyle = '#1c1c1e';
+    ctx.lineWidth = 1.5;
+    roundRect(bx, boxY, boxW, boxH, 7);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(bx + 12, boxY + boxH - 1);
+    ctx.lineTo(bx + 6, boxY + boxH + tailH);
+    ctx.lineTo(bx + 22, boxY + boxH - 1);
+    ctx.closePath();
+    ctx.fillStyle = '#fff9ec';
+    ctx.fill();
+    ctx.strokeStyle = '#1c1c1e';
+    ctx.stroke();
+
+    ctx.fillStyle = '#1c1c1e';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(speechBubble.text, bx + padX, boxY + boxH / 2 + 1);
+    ctx.restore();
+  }
+
   function roundRect(x, y, w, h, r) {
     ctx.beginPath();
     ctx.moveTo(x + r, y);
@@ -1076,43 +1163,65 @@
     ctx.closePath();
   }
 
+  function getSafeBounds() {
+    const rect = canvas.getBoundingClientRect();
+    let left = 0, right = W, top = 0, bottom = H;
+    if (rect.width > 0 && rect.height > 0) {
+      const displayAspect = rect.width / rect.height;
+      const gameAspect = W / H;
+      if (displayAspect < gameAspect) {
+        const visibleWidth = H * displayAspect;
+        const crop = (W - visibleWidth) / 2;
+        left = crop; right = W - crop;
+      } else if (displayAspect > gameAspect) {
+        const visibleHeight = W / displayAspect;
+        const crop = (H - visibleHeight) / 2;
+        top = crop; bottom = H - crop;
+      }
+    }
+    return { left, right, top, bottom };
+  }
+
   function drawHUD(c) {
     const s = String(Math.floor(score)).padStart(5, '0');
     const hs = String(highScore).padStart(5, '0');
+    const bounds = getSafeBounds();
+    const right = bounds.right;
+    const top = bounds.top;
 
     ctx.fillStyle = c.panel;
-    roundRect(W - 190, 8, 180, 26, 6);
+    roundRect(right - 190, top + 8, 180, 26, 6);
     ctx.fill();
 
     ctx.fillStyle = c.text;
     ctx.font = 'bold 15px monospace';
     ctx.textAlign = 'right';
-    ctx.fillText(`HI ${hs}   ${s}`, W - 14, 26);
+    ctx.fillText(`HI ${hs}   ${s}`, right - 14, top + 26);
 
     if (metalMode) {
       const pct = metalTimer / METAL_DURATION;
       ctx.fillStyle = c.panel;
-      roundRect(W - 190, 38, 180, 20, 6);
+      roundRect(right - 190, top + 38, 180, 20, 6);
       ctx.fill();
       ctx.fillStyle = '#ff3b57';
-      roundRect(W - 184, 41, 168 * pct, 8, 4);
+      roundRect(right - 184, top + 41, 168 * pct, 8, 4);
       ctx.fill();
       ctx.fillStyle = c.text;
       ctx.font = 'bold 11px monospace';
       ctx.textAlign = 'right';
-      ctx.fillText('MODO METAL', W - 14, 55);
+      ctx.fillText('MODO METAL', right - 14, top + 55);
     } else if (clawsActive) {
       const pct = clawsTimer / CLAWS_DURATION;
       ctx.fillStyle = c.panel;
-      roundRect(W - 190, 38, 180, 20, 6);
+      roundRect(right - 190, top + 38, 180, 20, 6);
       ctx.fill();
       ctx.fillStyle = CLAWS_GLOW;
-      roundRect(W - 184, 41, 168 * pct, 8, 4);
+      roundRect(right - 184, top + 41, 168 * pct, 8, 4);
       ctx.fill();
       ctx.fillStyle = c.text;
       ctx.font = 'bold 11px monospace';
       ctx.textAlign = 'right';
-      ctx.fillText('GARRAS', W - 14, 55);
+      ctx.fillText('GARRAS', right - 14, top + 55);
     }
   }
 
@@ -1139,6 +1248,7 @@
     drawObstacles();
     drawRabbit(c);
     drawParticles();
+    drawSpeechBubble();
     drawHUD(c);
 
     if (state === 'waiting') {
@@ -1232,3 +1342,9 @@
   resetDino();
   requestAnimationFrame(loop);
 })();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}

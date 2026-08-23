@@ -1,0 +1,15 @@
+{
+  "name": "Conejo Metalero Runner",
+  "short_name": "Conejo Metalero",
+  "description": "Juego estilo Chrome Dino con un conejo metalero, power-ups y depredadores",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#6ec6ff",
+  "theme_color": "#1c1c1e",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
