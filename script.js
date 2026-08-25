@@ -234,6 +234,7 @@
     grounded: true,
     legFrame: 0,
     legTimer: 0,
+    runPhase: 0,
   };
 
   function groundRefY() {
@@ -250,6 +251,7 @@
     dino.vy = 0;
     dino.ducking = false;
     dino.grounded = true;
+    dino.runPhase = 0;
   }
 
   function jump() {
@@ -512,6 +514,9 @@
         if (stepTimer <= 0) {
           stepTimer += STEP_DISTANCE;
           sfxStep(dino.legFrame);
+        }
+        if (!dino.ducking) {
+          dino.runPhase += speed * (metalMode ? 0.14 : 0.1);
         }
       }
 
@@ -817,6 +822,15 @@
     const headCx = x + 30, headCy = y + 13;
     const hipY = y + 42;
     const torsoCx = x + 23;
+    const runSwing = dino.grounded ? Math.sin(dino.runPhase) : 0;
+
+    ctx.save();
+    if (dino.grounded && !celebrating) {
+      const pivotX = x + 20, pivotY = y + h;
+      ctx.translate(pivotX, pivotY);
+      ctx.rotate(0.1);
+      ctx.translate(-pivotX, -pivotY);
+    }
 
     // tail (costume pompom)
     ctx.fillStyle = RABBIT.fur;
@@ -831,7 +845,7 @@
     } else if (!dino.grounded) {
       drawLimb(backShoulder.x, backShoulder.y, 135, 13, false);
     } else {
-      drawLimb(backShoulder.x, backShoulder.y, dino.legFrame === 0 ? 70 : 105, 14, false);
+      drawLimb(backShoulder.x, backShoulder.y, 87.5 + runSwing * 17.5, 14, false);
     }
 
     // hood ears (behind head, tilted back)
@@ -871,12 +885,14 @@
     if (!dino.grounded) {
       ctx.beginPath(); ctx.ellipse(x + 17, y + h - 6, 5.5, 8, 0.1, 0, Math.PI * 2); ctx.fill();
       ctx.beginPath(); ctx.ellipse(x + 30, y + h - 6, 5.5, 8, -0.1, 0, Math.PI * 2); ctx.fill();
-    } else if (dino.legFrame === 0) {
-      ctx.beginPath(); ctx.ellipse(x + 16, y + h - 4, 6, 6, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(x + 31, y + h - 8, 5.5, 9, 0, 0, Math.PI * 2); ctx.fill();
     } else {
-      ctx.beginPath(); ctx.ellipse(x + 16, y + h - 8, 5.5, 9, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(x + 31, y + h - 4, 6, 6, 0, 0, Math.PI * 2); ctx.fill();
+      const strideX = runSwing * 2;
+      ctx.beginPath();
+      ctx.ellipse(x + 16 - strideX, y + h - 6 - runSwing * 2, 6, 7.5 + runSwing * 1.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(x + 31 + strideX, y + h - 6 + runSwing * 2, 6, 7.5 - runSwing * 1.5, 0, 0, Math.PI * 2);
+      ctx.fill();
     }
 
     // torso (leather jacket over the costume)
@@ -901,7 +917,7 @@
     } else if (!dino.grounded) {
       drawLimb(frontShoulder.x, frontShoulder.y, 45, 13, false);
     } else {
-      drawLimb(frontShoulder.x, frontShoulder.y, dino.legFrame === 0 ? 105 : 70, 14, false);
+      drawLimb(frontShoulder.x, frontShoulder.y, 87.5 - runSwing * 17.5, 14, false);
     }
 
     // studded collar
@@ -921,13 +937,12 @@
     ctx.arc(headCx + 1, headCy + 7, 3.5, 0, Math.PI * 2);
     ctx.fill();
 
-    // sunglasses
+    // sunglasses (single lens, profile view facing the direction of travel)
     ctx.fillStyle = RABBIT.glasses;
-    roundRect(headCx - 8, headCy - 4, 18, 7, 2.5);
+    roundRect(headCx - 3, headCy - 4, 14, 7, 2.5);
     ctx.fill();
     ctx.fillStyle = celebrating || metalMode ? `rgba(255,59,87,${0.55 + glow * 0.45})` : dino.burrowed ? CLAWS_GLOW : RABBIT.lens;
-    roundRect(headCx - 6, headCy - 3, 6.5, 5, 1.5); ctx.fill();
-    roundRect(headCx + 2.5, headCy - 3, 6.5, 5, 1.5); ctx.fill();
+    roundRect(headCx - 1, headCy - 3, 10, 5, 1.5); ctx.fill();
 
     // snout + nose
     ctx.fillStyle = RABBIT.fur;
@@ -946,6 +961,8 @@
     ctx.moveTo(headCx + 12, headCy + 6); ctx.lineTo(headCx + 22, headCy + 3);
     ctx.moveTo(headCx + 12, headCy + 8); ctx.lineTo(headCx + 22, headCy + 9);
     ctx.stroke();
+
+    ctx.restore();
   }
 
   function drawObstacles() {
